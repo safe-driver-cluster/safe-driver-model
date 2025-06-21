@@ -24,15 +24,23 @@
 ### Upgrade pip (Important)
         pip install --upgrade pip
 
-### install the project libraries
+### install (or update) the project libraries
         pip install -r requirements.txt
 
-## DO NOT RUN BELLOW
+## DEVELOPER MODE INSTRUCTIONS [DO NOT RUN BELLOW]
 
-### libraries
+### download dlib library
+        https://github.com/z-mahmud22/Dlib_Windows_Python3.x/blob/main/dlib-19.22.99-cp310-cp310-win_amd64.whl
+
+### copy the dlib library to 
+        path --> safe-driver-model/
+
+## install libraries
         pip install mediapipe opencv-python numpy gps3
+        pip install cmake
         pip install dlib-19.22.99-cp310-cp310-win_amd64.whl
+        pip install face_recognition
 
-### save the working environment
+### save the working environment (run only when new libraries installed)
         pip freeze > requirements.txt
 
