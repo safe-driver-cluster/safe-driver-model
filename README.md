@@ -9,14 +9,16 @@
 ### check python version [3.10.9]
         python --version
 
+## check the environment variables to ensure the path is correct
+
 ### create python environment
         python -m venv venv
         .\venv\Scripts\Activate
 
-### - Temporarily Change Execution Policy
+## - Temporarily Change Execution Policy
         Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 
-### - Permenantly Change Execution Policy
+## - Permenantly Change Execution Policy
         Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ## 
