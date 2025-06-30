@@ -17,3 +17,17 @@ def extract_frames_from_video(video_path, output_folder, step=30):
 
     cap.release()
     print(f"Extracted {frame_id} frames from {video_path}.")
+
+def batch_process(category):
+    input_dir = f"../videos/{category}"
+    output_dir = f"../frames/{category}"
+
+    for file in os.listdir(input_dir):
+        if file.endswith(".mp4"):
+            extract_frames_from_video(os.path.join(input_dir, file), output_dir)
+
+if __name__ == "__main__":
+    categories = ["drowsy", "yawning", "phone_call", "texting", "smoking", "looking_back", "normal"]
+    for cat in categories:
+        print(f"Processing category: {cat}")
+        batch_process(cat)
