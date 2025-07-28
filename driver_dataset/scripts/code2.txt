@@ -1,0 +1,100 @@
+# prompt: I want to open the camera and get real time inputs from the camera and then predict if driver is drowsy or sleeping
+
+from IPython.display import display, Javascript, Image
+from google.colab.output import eval_js
+from base64 import b64decode
+import cv2
+import numpy as np
+from keras.models import load_model
+import tensorflow as tf
+
+# Function to capture image from webcam
+def take_photo(filename='photo.jpg', quality=0.8):
+  js = Javascript('''
+    async function takePhoto(quality) {
+      const div = document.createElement('div');
+      const capture = document.createElement('button');
+      capture.textContent = 'Capture Photo';
+      div.appendChild(capture);
+
+      const video = document.createElement('video');
+      video.style.display = 'block';
+      const stream = await navigator.mediaDevices.getUserMedia({video: true});
+
+      document.body.appendChild(div);
+      div.appendChild(video);
+      video.srcObject = stream;
+      await video.play();
+
+      // Resize the output to fit the video element.
+      google.colab.output.setIframeHeight(document.documentElement.scrollHeight, true);
+
+      // Wait for Capture to be clicked.
+      await new Promise((resolve) => capture.onclick = resolve);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      stream.getVideoTracks()[0].stop();
+      div.remove();
+      return canvas.toDataURL('image/jpeg', quality);
+    }
+    ''')
+  display(js)
+  data = eval_js('takePhoto({})'.format(quality))
+  binary = b64decode(data.split(',')[1])
+  with open(filename, 'wb') as f:
+    f.write(binary)
+  return filename
+
+# Load the trained model and face cascade
+model = tf.keras.models.load_model("./drowiness_new6.h5")
+face_cascade = cv2.CascadeClassifier("/root/.cache/kagglehub/datasets/adinishad/prediction-images/versions/9/haarcascade_frontalface_default.xml")
+IMG_SIZE = 145
+labels_new = ["yawn", "no_yawn", "Closed", "Open"]
+
+# Function to process and predict on a frame
+def predict_drowsiness(frame):
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+
+    for (x, y, w, h) in faces:
+        roi_color = frame[y:y+h, x:x+w]
+        resized_array = cv2.resize(roi_color, (IMG_SIZE, IMG_SIZE))
+        # Normalize the image (assuming the model was trained with normalized images)
+        normalized_array = resized_array / 255.0
+        prediction = model.predict(np.expand_dims(normalized_array, axis=0))
+        predicted_class = np.argmax(prediction)
+        status = labels_new[predicted_class]
+
+        color = (0, 255, 0) if status == "Open" or status == "no_yawn" else (0, 0, 255)
+        cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
+        cv2.putText(frame, status, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+
+    return frame
+
+# This part is for capturing and processing a single frame.
+# For real-time, you would need a continuous video stream, which is more complex
+# in a browser-based environment like Colab without additional libraries or tools.
+
+# To demonstrate with a single frame:
+try:
+  filename = take_photo()
+  print('Saved to {}'.format(filename))
+
+  # Read the captured image
+  img = cv2.imread(filename)
+  img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # Convert to RGB for displaying with matplotlib
+
+  # Process the image and get prediction
+  processed_img = predict_drowsiness(img.copy()) # Pass a copy to avoid modifying the original
+
+  # Display the processed image
+  plt.imshow(processed_img)
+  plt.axis('off')
+  plt.show()
+
+except Exception as err:
+  # Errors will be thrown if the user does not allow the camera feed.
+  print(str(err))

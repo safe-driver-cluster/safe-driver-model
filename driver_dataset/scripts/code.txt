@@ -1,0 +1,32 @@
+# prompt: /root/.cache/kagglehub/datasets/dheerajperumandla/drowsiness-dataset/versions/1/train/Closed/_101.jpg
+# add this image instead of the captured picture. and also output the picture with status
+
+# Function to display image and its predicted status
+def display_image_with_prediction(filepath, model, labels):
+    img_array = cv2.imread(filepath) # Read the image
+    plt.imshow(cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)) # Display the image (convert BGR to RGB for matplotlib)
+    plt.axis('off') # Hide axes
+    plt.show() # Show the image
+
+    # Prepare the image for prediction
+    prepared_image = prepare(filepath)
+
+    # Make the prediction
+    prediction = model.predict([prepared_image])
+    predicted_class_index = np.argmax(prediction)
+    predicted_status = labels[predicted_class_index]
+
+    print(f"Predicted status: {predicted_status}")
+
+# Load the saved model
+model = tf.keras.models.load_model("./drowiness_new6.h5")
+
+# Define the labels
+labels_new = ["yawn", "no_yawn", "Closed", "Open"]
+
+# Define the image path
+#image_path = "/root/.cache/kagglehub/datasets/dheerajperumandla/drowsiness-dataset/versions/1/train/Closed/_101.jpg"
+image_path = "/root/.cache/kagglehub/datasets/dheerajperumandla/drowsiness-dataset/versions/1/train/Open/_117.jpg"
+
+# Display the image and its predicted status
+display_image_with_prediction(image_path, model, labels_new)
