@@ -9,7 +9,8 @@ from scipy.spatial import distance
 import warnings
 warnings.filterwarnings('ignore')
 
-image_path = 'test1.png'
+image_path = 'test1.jpg'
+# image_path = 'test2.png'
 image = Image.open(image_path)
 # plt.axis('off')
 # plt.imshow(image)
@@ -106,11 +107,17 @@ def process_image(frame):
             right_eye = np.array(landmarks['right_eye'])
             mouth = np.array(landmarks['bottom_lip'])
 
+            print(f"Left eye points: {left_eye}")
+            print(f"Right eye points: {right_eye}")
+            print(f"Mouth points: {mouth}")
+
             # calculate ear and mar
             left_ear = eye_aspect_ratio(left_eye)
             right_ear = eye_aspect_ratio(right_eye)
             ear = (left_ear+right_ear) / 2.0
             mar = mouth_aspect_ratio(mouth)
+
+            print(f"EAR: {ear}, MAR: {mar}")
 
             # check if eyes are closed
             if ear < EYE_AR_THRESH:
