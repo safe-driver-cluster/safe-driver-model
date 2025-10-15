@@ -75,7 +75,7 @@ def run(model: str, num_faces: int,
                     unused_output_image: mp.Image, timestamp_ms: int):
         global FPS, COUNTER, START_TIME, DETECTION_RESULT
 
-        # Calculate the FPS
+        # Calculate the FPS (frame per second)
         if COUNTER % fps_avg_frame_count == 0:
             FPS = fps_avg_frame_count / (time.time() - START_TIME)
             START_TIME = time.time()
