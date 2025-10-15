@@ -25,6 +25,7 @@
 
 ### Upgrade pip (Important)
         pip install --upgrade pip
+        python.exe -m pip install --upgrade pip
 
 ### install (or update) the project libraries
         pip install -r requirements.txt
