@@ -491,7 +491,7 @@ def run(model: str, num_faces: int,
 
                     legend_y += (bar_height + gap_between_bars)
 
-        cv2.imshow('face_landmarker', current_frame)
+        cv2.imshow('SafeDriver Monitoring System', current_frame)
 
         # Stop the program if the ESC key is pressed.
         if cv2.waitKey(1) == 27:
