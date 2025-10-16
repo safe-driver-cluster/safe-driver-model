@@ -58,6 +58,13 @@ CONFIG = {
     'FPS_AVG_FRAME_COUNT': 10,
     'SCROLL_STEP': 20,
     
+    # Display Control Flags
+    'SHOW_BLENDSHAPES': False,  # Set to False to hide blendshapes panel
+    'SHOW_FACE_MESH': True,    # Set to False to hide face mesh overlay
+    'SHOW_FPS': True,          # Set to False to hide FPS counter
+    'SHOW_METRICS': True,      # Set to False to hide metrics box
+    'SHOW_WARNINGS': True,     # Set to False to hide warning messages
+    
     # FPS Display
     'FPS_FONT': cv2.FONT_HERSHEY_DUPLEX,
     'FPS_FONT_SIZE': 0.5,
@@ -333,48 +340,53 @@ def run(model: str, num_faces: int,
         detector.detect_async(mp_image, time.time_ns() // 1_000_000)
 
         # Show FPS
-        fps_text = CONFIG['FPS_TEXT_FORMAT'].format(FPS)
-        text_location = (CONFIG['LEFT_MARGIN'], CONFIG['ROW_SIZE'] + CONFIG['FPS_Y_OFFSET'])
-        current_frame = image
-        cv2.putText(current_frame, fps_text, text_location,
-                    CONFIG['FPS_FONT'], CONFIG['FPS_FONT_SIZE'], 
-                    CONFIG['FPS_COLOR'], CONFIG['FPS_FONT_THICKNESS'], cv2.LINE_AA)
+        if CONFIG['SHOW_FPS']:
+            fps_text = CONFIG['FPS_TEXT_FORMAT'].format(FPS)
+            text_location = (CONFIG['LEFT_MARGIN'], CONFIG['ROW_SIZE'] + CONFIG['FPS_Y_OFFSET'])
+            current_frame = image
+            cv2.putText(current_frame, fps_text, text_location,
+                        CONFIG['FPS_FONT'], CONFIG['FPS_FONT_SIZE'], 
+                        CONFIG['FPS_COLOR'], CONFIG['FPS_FONT_THICKNESS'], cv2.LINE_AA)
+        else:
+            current_frame = image
 
         if DETECTION_RESULT:
             # Draw landmarks
-            for face_landmarks in DETECTION_RESULT.face_landmarks:
-                face_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
-                face_landmarks_proto.landmark.extend([
-                    landmark_pb2.NormalizedLandmark(x=landmark.x, y=landmark.y, z=landmark.z)
-                    for landmark in face_landmarks
-                ])
-                mp_drawing.draw_landmarks(
-                    image=current_frame,
-                    landmark_list=face_landmarks_proto,
-                    connections=mp_face_mesh.FACEMESH_TESSELATION,
-                    landmark_drawing_spec=None,
-                    connection_drawing_spec=mp.solutions.drawing_styles
-                    .get_default_face_mesh_tesselation_style())
-                mp_drawing.draw_landmarks(
-                    image=current_frame,
-                    landmark_list=face_landmarks_proto,
-                    connections=mp_face_mesh.FACEMESH_CONTOURS,
-                    landmark_drawing_spec=None,
-                    connection_drawing_spec=mp.solutions.drawing_styles
-                    .get_default_face_mesh_contours_style())
-                mp_drawing.draw_landmarks(
-                    image=current_frame,
-                    landmark_list=face_landmarks_proto,
-                    connections=mp_face_mesh.FACEMESH_IRISES,
-                    landmark_drawing_spec=None,
-                    connection_drawing_spec=mp.solutions.drawing_styles
-                    .get_default_face_mesh_iris_connections_style())
+            if CONFIG['SHOW_FACE_MESH']:
+                for face_landmarks in DETECTION_RESULT.face_landmarks:
+                    face_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
+                    face_landmarks_proto.landmark.extend([
+                        landmark_pb2.NormalizedLandmark(x=landmark.x, y=landmark.y, z=landmark.z)
+                        for landmark in face_landmarks
+                    ])
+                    mp_drawing.draw_landmarks(
+                        image=current_frame,
+                        landmark_list=face_landmarks_proto,
+                        connections=mp_face_mesh.FACEMESH_TESSELATION,
+                        landmark_drawing_spec=None,
+                        connection_drawing_spec=mp.solutions.drawing_styles
+                        .get_default_face_mesh_tesselation_style())
+                    mp_drawing.draw_landmarks(
+                        image=current_frame,
+                        landmark_list=face_landmarks_proto,
+                        connections=mp_face_mesh.FACEMESH_CONTOURS,
+                        landmark_drawing_spec=None,
+                        connection_drawing_spec=mp.solutions.drawing_styles
+                        .get_default_face_mesh_contours_style())
+                    mp_drawing.draw_landmarks(
+                        image=current_frame,
+                        landmark_list=face_landmarks_proto,
+                        connections=mp_face_mesh.FACEMESH_IRISES,
+                        landmark_drawing_spec=None,
+                        connection_drawing_spec=mp.solutions.drawing_styles
+                        .get_default_face_mesh_iris_connections_style())
 
         # Expand right side for blendshapes
-        current_frame = cv2.copyMakeBorder(current_frame, 0, 0, 0,
-                                           CONFIG['LABEL_PADDING_WIDTH'],
-                                           cv2.BORDER_CONSTANT, None,
-                                           CONFIG['LABEL_BG_COLOR'])
+        if CONFIG['SHOW_BLENDSHAPES']:
+            current_frame = cv2.copyMakeBorder(current_frame, 0, 0, 0,
+                                               CONFIG['LABEL_PADDING_WIDTH'],
+                                               cv2.BORDER_CONSTANT, None,
+                                               CONFIG['LABEL_BG_COLOR'])
 
         if DETECTION_RESULT:
             legend_x = current_frame.shape[1] - CONFIG['LABEL_PADDING_WIDTH'] + CONFIG['BLENDSHAPE_X_OFFSET']
@@ -388,104 +400,107 @@ def run(model: str, num_faces: int,
                 
                 if behavior_data:
                     # Draw metrics background
-                    metrics_x = CONFIG['LEFT_MARGIN'] - CONFIG['METRICS_PADDING']
-                    metrics_y = CONFIG['ROW_SIZE'] + CONFIG['METRICS_Y_OFFSET']
-                    
-                    overlay = current_frame.copy()
-                    corner_radius = CONFIG['METRICS_CORNER_RADIUS']
-                    
-                    # Draw rounded rectangle
-                    cv2.rectangle(overlay,
-                                (metrics_x + corner_radius, metrics_y),
-                                (metrics_x + CONFIG['METRICS_WIDTH'] - corner_radius, 
-                                 metrics_y + CONFIG['METRICS_HEIGHT']),
-                                CONFIG['METRICS_BG_COLOR'], -1)
-                    cv2.rectangle(overlay,
-                                (metrics_x, metrics_y + corner_radius),
-                                (metrics_x + CONFIG['METRICS_WIDTH'], 
-                                 metrics_y + CONFIG['METRICS_HEIGHT'] - corner_radius),
-                                CONFIG['METRICS_BG_COLOR'], -1)
-                    
-                    # Corner circles
-                    for dx, dy in [(corner_radius, corner_radius),
-                                   (CONFIG['METRICS_WIDTH'] - corner_radius, corner_radius),
-                                   (corner_radius, CONFIG['METRICS_HEIGHT'] - corner_radius),
-                                   (CONFIG['METRICS_WIDTH'] - corner_radius, CONFIG['METRICS_HEIGHT'] - corner_radius)]:
-                        cv2.circle(overlay, (metrics_x + dx, metrics_y + dy),
-                                 corner_radius, CONFIG['METRICS_BG_COLOR'], -1)
-                    
-                    cv2.addWeighted(overlay, CONFIG['METRICS_BG_OPACITY'], 
-                                  current_frame, 1 - CONFIG['METRICS_BG_OPACITY'], 0, current_frame)
-                    
-                    # Display metrics
-                    metrics_data = [
-                        (CONFIG['LABEL_PERCLOS'].format(behavior_data['perclos']), CONFIG['PERCLOS_Y_OFFSET']),
-                        (CONFIG['LABEL_BLINKS'].format(behavior_data['blinks_per_min']), CONFIG['BLINKS_Y_OFFSET']),
-                        (CONFIG['LABEL_CLOSURES'].format(behavior_data['closure_count']), CONFIG['CLOSURES_Y_OFFSET']),
-                        (CONFIG['LABEL_YAWNS'].format(behavior_data['yawn_count']), CONFIG['YAWNS_Y_OFFSET']),
-                        (CONFIG['LABEL_MICROSLEEPS'].format(behavior_data['microsleep_count']), CONFIG['MICROSLEEPS_Y_OFFSET']),
-                        (CONFIG['LABEL_DROWSY_EVENTS'].format(behavior_data['drowsy_count']), CONFIG['DROWSY_EVENTS_Y_OFFSET']),
-                    ]
-                    
-                    for text, y_offset in metrics_data:
-                        cv2.putText(current_frame, text,
-                                   (CONFIG['LEFT_MARGIN'], CONFIG['ROW_SIZE'] + y_offset),
-                                   CONFIG['METRICS_FONT'], CONFIG['METRICS_FONT_SIZE'],
-                                   CONFIG['METRICS_TEXT_COLOR'], CONFIG['METRICS_FONT_THICKNESS'], cv2.LINE_AA)
+                    if CONFIG['SHOW_METRICS']:
+                        metrics_x = CONFIG['LEFT_MARGIN'] - CONFIG['METRICS_PADDING']
+                        metrics_y = CONFIG['ROW_SIZE'] + CONFIG['METRICS_Y_OFFSET']
+                        
+                        overlay = current_frame.copy()
+                        corner_radius = CONFIG['METRICS_CORNER_RADIUS']
+                        
+                        # Draw rounded rectangle
+                        cv2.rectangle(overlay,
+                                    (metrics_x + corner_radius, metrics_y),
+                                    (metrics_x + CONFIG['METRICS_WIDTH'] - corner_radius, 
+                                     metrics_y + CONFIG['METRICS_HEIGHT']),
+                                    CONFIG['METRICS_BG_COLOR'], -1)
+                        cv2.rectangle(overlay,
+                                    (metrics_x, metrics_y + corner_radius),
+                                    (metrics_x + CONFIG['METRICS_WIDTH'], 
+                                     metrics_y + CONFIG['METRICS_HEIGHT'] - corner_radius),
+                                    CONFIG['METRICS_BG_COLOR'], -1)
+                        
+                        # Corner circles
+                        for dx, dy in [(corner_radius, corner_radius),
+                                       (CONFIG['METRICS_WIDTH'] - corner_radius, corner_radius),
+                                       (corner_radius, CONFIG['METRICS_HEIGHT'] - corner_radius),
+                                       (CONFIG['METRICS_WIDTH'] - corner_radius, CONFIG['METRICS_HEIGHT'] - corner_radius)]:
+                            cv2.circle(overlay, (metrics_x + dx, metrics_y + dy),
+                                     corner_radius, CONFIG['METRICS_BG_COLOR'], -1)
+                        
+                        cv2.addWeighted(overlay, CONFIG['METRICS_BG_OPACITY'], 
+                                      current_frame, 1 - CONFIG['METRICS_BG_OPACITY'], 0, current_frame)
+                        
+                        # Display metrics
+                        metrics_data = [
+                            (CONFIG['LABEL_PERCLOS'].format(behavior_data['perclos']), CONFIG['PERCLOS_Y_OFFSET']),
+                            (CONFIG['LABEL_BLINKS'].format(behavior_data['blinks_per_min']), CONFIG['BLINKS_Y_OFFSET']),
+                            (CONFIG['LABEL_CLOSURES'].format(behavior_data['closure_count']), CONFIG['CLOSURES_Y_OFFSET']),
+                            (CONFIG['LABEL_YAWNS'].format(behavior_data['yawn_count']), CONFIG['YAWNS_Y_OFFSET']),
+                            (CONFIG['LABEL_MICROSLEEPS'].format(behavior_data['microsleep_count']), CONFIG['MICROSLEEPS_Y_OFFSET']),
+                            (CONFIG['LABEL_DROWSY_EVENTS'].format(behavior_data['drowsy_count']), CONFIG['DROWSY_EVENTS_Y_OFFSET']),
+                        ]
+                        
+                        for text, y_offset in metrics_data:
+                            cv2.putText(current_frame, text,
+                                       (CONFIG['LEFT_MARGIN'], CONFIG['ROW_SIZE'] + y_offset),
+                                       CONFIG['METRICS_FONT'], CONFIG['METRICS_FONT_SIZE'],
+                                       CONFIG['METRICS_TEXT_COLOR'], CONFIG['METRICS_FONT_THICKNESS'], cv2.LINE_AA)
                     
                     # Display warnings
-                    frame_width = current_frame.shape[1] - CONFIG['LABEL_PADDING_WIDTH']
-                    
-                    warning_checks = [
-                        (behavior_data['microsleep'], CONFIG['WARNING_MICROSLEEP'], 
-                         CONFIG['CONSOLE_MICROSLEEP'].format(behavior_data['microsleep_count'])),
-                        (behavior_data['yawning'], CONFIG['WARNING_YAWNING'],
-                         CONFIG['CONSOLE_YAWN'].format(behavior_data['yawn_count'])),
-                        (behavior_data['frequent_closures'], CONFIG['WARNING_FREQUENT_CLOSURES'],
-                         CONFIG['CONSOLE_FREQUENT_CLOSURES']),
-                        (behavior_data['drowsy'], CONFIG['WARNING_DROWSY'],
-                         CONFIG['CONSOLE_DROWSY'].format(behavior_data['drowsy_count'])),
-                    ]
-                    
-                    for condition, warning_text, console_msg in warning_checks:
-                        if condition:
-                            (text_width, _), _ = cv2.getTextSize(warning_text,
-                                                                 CONFIG['WARNING_FONT'],
-                                                                 CONFIG['WARNING_FONT_SIZE'],
-                                                                 CONFIG['WARNING_FONT_THICKNESS'])
-                            right_x = frame_width - text_width - CONFIG['WARNING_RIGHT_MARGIN']
-                            cv2.putText(current_frame, warning_text,
-                                       (right_x, CONFIG['WARNING_Y_POSITION']),
-                                       CONFIG['WARNING_FONT'], CONFIG['WARNING_FONT_SIZE'],
-                                       CONFIG['WARNING_COLOR'], CONFIG['WARNING_FONT_THICKNESS'], cv2.LINE_AA)
-                            print(console_msg)
-                            break
+                    if CONFIG['SHOW_WARNINGS']:
+                        frame_width = current_frame.shape[1] - CONFIG['LABEL_PADDING_WIDTH']
+                        
+                        warning_checks = [
+                            (behavior_data['microsleep'], CONFIG['WARNING_MICROSLEEP'], 
+                             CONFIG['CONSOLE_MICROSLEEP'].format(behavior_data['microsleep_count'])),
+                            (behavior_data['yawning'], CONFIG['WARNING_YAWNING'],
+                             CONFIG['CONSOLE_YAWN'].format(behavior_data['yawn_count'])),
+                            (behavior_data['frequent_closures'], CONFIG['WARNING_FREQUENT_CLOSURES'],
+                             CONFIG['CONSOLE_FREQUENT_CLOSURES']),
+                            (behavior_data['drowsy'], CONFIG['WARNING_DROWSY'],
+                             CONFIG['CONSOLE_DROWSY'].format(behavior_data['drowsy_count'])),
+                        ]
+                        
+                        for condition, warning_text, console_msg in warning_checks:
+                            if condition:
+                                (text_width, _), _ = cv2.getTextSize(warning_text,
+                                                                     CONFIG['WARNING_FONT'],
+                                                                     CONFIG['WARNING_FONT_SIZE'],
+                                                                     CONFIG['WARNING_FONT_THICKNESS'])
+                                right_x = frame_width - text_width - CONFIG['WARNING_RIGHT_MARGIN']
+                                cv2.putText(current_frame, warning_text,
+                                           (right_x, CONFIG['WARNING_Y_POSITION']),
+                                           CONFIG['WARNING_FONT'], CONFIG['WARNING_FONT_SIZE'],
+                                           CONFIG['WARNING_COLOR'], CONFIG['WARNING_FONT_THICKNESS'], cv2.LINE_AA)
+                                print(console_msg)
+                                break
                 
                 # Draw blendshapes
-                num_blendshapes = len(face_blendshapes[0])
-                total_height = num_blendshapes * (CONFIG['BLENDSHAPE_BAR_HEIGHT'] + CONFIG['BLENDSHAPE_GAP_BETWEEN_BARS'])
-                MAX_SCROLL = max(0, total_height - current_frame.shape[0] + 60)
-                
-                for category in face_blendshapes[0]:
-                    if legend_y + CONFIG['BLENDSHAPE_BAR_HEIGHT'] > 0 and legend_y < current_frame.shape[0]:
-                        text = CONFIG['BLENDSHAPE_TEXT_FORMAT'].format(category.category_name, round(category.score, 2))
-                        (text_width, _), _ = cv2.getTextSize(text, CONFIG['BLENDSHAPE_FONT'],
-                                                            CONFIG['BLENDSHAPE_FONT_SIZE'],
-                                                            CONFIG['BLENDSHAPE_FONT_THICKNESS'])
+                if CONFIG['SHOW_BLENDSHAPES']:
+                    num_blendshapes = len(face_blendshapes[0])
+                    total_height = num_blendshapes * (CONFIG['BLENDSHAPE_BAR_HEIGHT'] + CONFIG['BLENDSHAPE_GAP_BETWEEN_BARS'])
+                    MAX_SCROLL = max(0, total_height - current_frame.shape[0] + 60)
+                    
+                    for category in face_blendshapes[0]:
+                        if legend_y + CONFIG['BLENDSHAPE_BAR_HEIGHT'] > 0 and legend_y < current_frame.shape[0]:
+                            text = CONFIG['BLENDSHAPE_TEXT_FORMAT'].format(category.category_name, round(category.score, 2))
+                            (text_width, _), _ = cv2.getTextSize(text, CONFIG['BLENDSHAPE_FONT'],
+                                                                CONFIG['BLENDSHAPE_FONT_SIZE'],
+                                                                CONFIG['BLENDSHAPE_FONT_THICKNESS'])
 
-                        cv2.putText(current_frame, text,
-                                    (legend_x, legend_y + (CONFIG['BLENDSHAPE_BAR_HEIGHT'] // 2) + 5),
-                                    CONFIG['BLENDSHAPE_FONT'], CONFIG['BLENDSHAPE_FONT_SIZE'],
-                                    CONFIG['BLENDSHAPE_TEXT_COLOR'], CONFIG['BLENDSHAPE_FONT_THICKNESS'], cv2.LINE_AA)
+                            cv2.putText(current_frame, text,
+                                        (legend_x, legend_y + (CONFIG['BLENDSHAPE_BAR_HEIGHT'] // 2) + 5),
+                                        CONFIG['BLENDSHAPE_FONT'], CONFIG['BLENDSHAPE_FONT_SIZE'],
+                                        CONFIG['BLENDSHAPE_TEXT_COLOR'], CONFIG['BLENDSHAPE_FONT_THICKNESS'], cv2.LINE_AA)
 
-                        bar_width = int(bar_max_width * category.score)
-                        cv2.rectangle(current_frame,
-                                    (legend_x + text_width + CONFIG['BLENDSHAPE_TEXT_GAP'], legend_y),
-                                    (legend_x + text_width + CONFIG['BLENDSHAPE_TEXT_GAP'] + bar_width,
-                                     legend_y + CONFIG['BLENDSHAPE_BAR_HEIGHT']),
-                                    CONFIG['BLENDSHAPE_BAR_COLOR'], -1)
+                            bar_width = int(bar_max_width * category.score)
+                            cv2.rectangle(current_frame,
+                                        (legend_x + text_width + CONFIG['BLENDSHAPE_TEXT_GAP'], legend_y),
+                                        (legend_x + text_width + CONFIG['BLENDSHAPE_TEXT_GAP'] + bar_width,
+                                         legend_y + CONFIG['BLENDSHAPE_BAR_HEIGHT']),
+                                        CONFIG['BLENDSHAPE_BAR_COLOR'], -1)
 
-                    legend_y += (CONFIG['BLENDSHAPE_BAR_HEIGHT'] + CONFIG['BLENDSHAPE_GAP_BETWEEN_BARS'])
+                        legend_y += (CONFIG['BLENDSHAPE_BAR_HEIGHT'] + CONFIG['BLENDSHAPE_GAP_BETWEEN_BARS'])
 
         cv2.imshow(CONFIG['WINDOW_NAME'], current_frame)
 
