@@ -241,8 +241,8 @@ def run(model: str, num_faces: int,
             else:  # Scroll down
                 SCROLL_OFFSET = min(MAX_SCROLL, SCROLL_OFFSET + 20)
 
-    cv2.namedWindow('face_landmarker')
-    cv2.setMouseCallback('face_landmarker', mouse_callback)
+    cv2.namedWindow('SafeDriver Monitoring System')
+    cv2.setMouseCallback('SafeDriver Monitoring System', mouse_callback)
 
     def save_result(result: vision.FaceLandmarkerResult,
                     unused_output_image: mp.Image, timestamp_ms: int):
