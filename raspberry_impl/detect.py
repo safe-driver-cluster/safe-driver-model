@@ -31,40 +31,136 @@ mp_face_mesh = mp.solutions.face_mesh
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 
+# ============================================================================
+# CONFIGURATION SECTION - All configurable parameters
+# ============================================================================
+
+CONFIG = {
+    # Drowsiness Detection Thresholds
+    'EYE_CLOSED_THRESH': 0.60,
+    'EYE_PARTIAL_THRESH': 0.40,
+    'MICROSLEEP_SEC': 1.5,
+    'PERCLOS_WIN_SEC': 60.0,
+    'PERCLOS_DROWSY': 0.70,
+    'YAWN_THRESH': 0.80,
+    'YAWN_MIN_SEC': 1.0,
+    'EYE_CLOSURE_FREQ_WIN': 15.0,
+    'EYE_CLOSURE_FREQ_THRESH': 4,
+    'MIN_CLOSURE_DURATION': 0.4,
+    'BLINK_MAX_DURATION': 0.4,
+    'CLOSURE_DEBOUNCE_TIME': 0.5,
+    
+    # UI Layout Parameters
+    'WINDOW_NAME': 'SafeDriver Monitoring System',
+    'ROW_SIZE': 50,
+    'LEFT_MARGIN': 24,
+    'LABEL_PADDING_WIDTH': 1500,
+    'FPS_AVG_FRAME_COUNT': 10,
+    'SCROLL_STEP': 20,
+    
+    # FPS Display
+    'FPS_FONT': cv2.FONT_HERSHEY_DUPLEX,
+    'FPS_FONT_SIZE': 0.5,
+    'FPS_FONT_THICKNESS': 1,
+    'FPS_COLOR': (0, 0, 0),
+    'FPS_TEXT_FORMAT': 'FPS = {:.1f}',
+    'FPS_Y_OFFSET': -20,
+    
+    # Metrics Box (Top Left)
+    'METRICS_PADDING': 10,
+    'METRICS_WIDTH': 175,
+    'METRICS_HEIGHT': 140,
+    'METRICS_Y_OFFSET': 0,
+    'METRICS_CORNER_RADIUS': 10,
+    'METRICS_BG_COLOR': (255, 255, 255),
+    'METRICS_BG_OPACITY': 0.5,
+    'METRICS_FONT': cv2.FONT_HERSHEY_SIMPLEX,
+    'METRICS_FONT_SIZE': 0.5,
+    'METRICS_FONT_THICKNESS': 1,
+    'METRICS_TEXT_COLOR': (0, 0, 0),
+    
+    # Metrics Text Labels
+    'LABEL_PERCLOS': 'PERCLOS: {:.2f}',
+    'LABEL_BLINKS': 'Blinks/min: {:02d}',
+    'LABEL_CLOSURES': 'Closures(15s): {}',
+    'LABEL_YAWNS': 'Yawns: {}',
+    'LABEL_MICROSLEEPS': 'Microsleeps: {}',
+    'LABEL_DROWSY_EVENTS': 'Drowsy Events: {}',
+    
+    # Metrics Text Positions (relative to row_size)
+    'PERCLOS_Y_OFFSET': 20,
+    'BLINKS_Y_OFFSET': 40,
+    'CLOSURES_Y_OFFSET': 60,
+    'YAWNS_Y_OFFSET': 85,
+    'MICROSLEEPS_Y_OFFSET': 105,
+    'DROWSY_EVENTS_Y_OFFSET': 125,
+    
+    # Warning Display (Top Right)
+    'WARNING_FONT': cv2.FONT_HERSHEY_DUPLEX,
+    'WARNING_FONT_SIZE': 1.0,
+    'WARNING_FONT_THICKNESS': 2,
+    'WARNING_COLOR': (0, 0, 255),
+    'WARNING_Y_POSITION': 50,
+    'WARNING_RIGHT_MARGIN': 20,
+    
+    # Warning Text Messages
+    'WARNING_MICROSLEEP': 'Microsleep Detected!',
+    'WARNING_YAWNING': 'Yawning Detected!',
+    'WARNING_FREQUENT_CLOSURES': 'Frequent Eye Closures!',
+    'WARNING_DROWSY': 'Drowsiness Detected!',
+    
+    # Console Messages
+    'CONSOLE_MICROSLEEP': 'Microsleep detected (Total: {})',
+    'CONSOLE_YAWN': 'Yawn detected (Total: {})',
+    'CONSOLE_FREQUENT_CLOSURES': 'Frequent eye closures detected',
+    'CONSOLE_DROWSY': 'Drowsiness detected (Total: {})',
+    
+    # Blendshapes Display (Right Panel)
+    'BLENDSHAPE_FONT': cv2.FONT_HERSHEY_SIMPLEX,
+    'BLENDSHAPE_FONT_SIZE': 0.4,
+    'BLENDSHAPE_FONT_THICKNESS': 1,
+    'BLENDSHAPE_TEXT_COLOR': (0, 0, 0),
+    'BLENDSHAPE_BAR_COLOR': (0, 255, 0),
+    'BLENDSHAPE_BAR_HEIGHT': 8,
+    'BLENDSHAPE_GAP_BETWEEN_BARS': 5,
+    'BLENDSHAPE_TEXT_GAP': 5,
+    'BLENDSHAPE_X_OFFSET': 20,
+    'BLENDSHAPE_Y_START': 30,
+    'BLENDSHAPE_TEXT_FORMAT': '{} ({:.2f})',
+    
+    # Face Mesh Drawing Colors
+    'LABEL_BG_COLOR': (255, 255, 255),
+    
+    # Camera Error Message
+    'CAMERA_ERROR_MSG': 'ERROR: Unable to read from webcam. Please verify your webcam settings.'
+}
+
+# ============================================================================
+# END CONFIGURATION SECTION
+# ============================================================================
+
 # Global variables to calculate FPS
 COUNTER, FPS = 0, 0
 START_TIME = time.time()
 DETECTION_RESULT = None
 
-# ---- Drowsiness thresholds (tune for your camera/person/environment) ----
-EYE_CLOSED_THRESH = 0.60    # avg(eyeBlinkLeft, eyeBlinkRight) above this = closed
-EYE_PARTIAL_THRESH = 0.40   # threshold for partial eye closure detection
-MICROSLEEP_SEC    = 1.5     # eyes closed for this long -> microsleep
-PERCLOS_WIN_SEC   = 60.0    # rolling window for PERCLOS
-PERCLOS_DROWSY    = 0.70    # >=70% of last minute eyes-closed -> drowsy
-YAWN_THRESH       = 0.80    # mouthLowerDown above this = yawning
-YAWN_MIN_SEC      = 1.0     # sustained open for this long -> yawn flag
-EYE_CLOSURE_FREQ_WIN = 15.0  # 15 seconds window for eye closure frequency
-EYE_CLOSURE_FREQ_THRESH = 4  # more than 4 closures in 10 seconds = drowsy
-MIN_CLOSURE_DURATION = 0.4   # minimum duration (seconds) to count as drowsy closure, not blink
-
 # ---- State (globals) ----
 EYE_CLOSED_START = None
 YAWN_START = None
-PERCLOS_WIN = deque()   # holds (timestamp, is_closed_int)
-BLINK_TIMES = deque()   # timestamps of blinks in the last 60s
-EYE_CLOSURE_EVENTS = deque()  # timestamps of eye closures > 0.4 in last 10s
-EYE_PARTIAL_CLOSURE_START = None  # track when partial closure (>0.4) starts
+PERCLOS_WIN = deque()
+BLINK_TIMES = deque()
+EYE_CLOSURE_EVENTS = deque()
+EYE_PARTIAL_CLOSURE_START = None
 
 # Event counters
 YAWN_COUNT = 0
 DROWSY_COUNT = 0
 MICROSLEEP_COUNT = 0
-YAWN_COUNTED = False  # Flag to prevent counting same yawn multiple times
-MICROSLEEP_COUNTED = False  # Flag to prevent counting same microsleep multiple times
-DROWSY_COUNTED = False  # Flag to prevent counting same drowsy event multiple times
+YAWN_COUNTED = False
+MICROSLEEP_COUNTED = False
+DROWSY_COUNTED = False
 
-# Add these global variables at the top with other globals
+# Scroll variables
 SCROLL_OFFSET = 0
 MAX_SCROLL = 0
 
@@ -90,40 +186,33 @@ def detect_driver_behavior(face_blendshapes: np.ndarray, height, current_frame) 
         mouth_lower_down_l = _bs_score(bs, "mouthLowerDownLeft")
         mouth_lower_down = 0.5 * (mouth_lower_down_r + mouth_lower_down_l)
 
-        # --- PERCLOS window maintenance (1 = closed, 0 = open) ---
-        is_closed = 1 if eye_closed_score > EYE_CLOSED_THRESH else 0
+        # --- PERCLOS window maintenance ---
+        is_closed = 1 if eye_closed_score > CONFIG['EYE_CLOSED_THRESH'] else 0
         PERCLOS_WIN.append((now, is_closed))
-        while PERCLOS_WIN and (now - PERCLOS_WIN[0][0]) > PERCLOS_WIN_SEC:
+        while PERCLOS_WIN and (now - PERCLOS_WIN[0][0]) > CONFIG['PERCLOS_WIN_SEC']:
             PERCLOS_WIN.popleft()
         perclos = (sum(v for _, v in PERCLOS_WIN) / len(PERCLOS_WIN)) if PERCLOS_WIN else 0.0
 
-        # --- Eye closure frequency tracking (>0.4 threshold, duration >= 0.4s) ---
+        # --- Eye closure frequency tracking ---
         global EYE_CLOSURE_EVENTS, EYE_PARTIAL_CLOSURE_START
         
-        # Track when partial closure starts
-        if eye_closed_score > EYE_PARTIAL_THRESH:
+        if eye_closed_score > CONFIG['EYE_PARTIAL_THRESH']:
             if EYE_PARTIAL_CLOSURE_START is None:
                 EYE_PARTIAL_CLOSURE_START = now
         else:
-            # Eyes reopened - check if this was a drowsy closure (not a quick blink)
             if EYE_PARTIAL_CLOSURE_START is not None:
                 closure_duration = now - EYE_PARTIAL_CLOSURE_START
                 
-                # Only count if closure lasted at least MIN_CLOSURE_DURATION (0.4 seconds)
-                # This filters out quick blinks
-                if closure_duration >= MIN_CLOSURE_DURATION:
-                    # Avoid counting the same closure multiple times
-                    if not EYE_CLOSURE_EVENTS or (EYE_PARTIAL_CLOSURE_START - EYE_CLOSURE_EVENTS[-1]) > 0.5:
+                if closure_duration >= CONFIG['MIN_CLOSURE_DURATION']:
+                    if not EYE_CLOSURE_EVENTS or (EYE_PARTIAL_CLOSURE_START - EYE_CLOSURE_EVENTS[-1]) > CONFIG['CLOSURE_DEBOUNCE_TIME']:
                         EYE_CLOSURE_EVENTS.append(now)
                 
                 EYE_PARTIAL_CLOSURE_START = None
         
-        # Keep only last 10 seconds of closure events
-        while EYE_CLOSURE_EVENTS and (now - EYE_CLOSURE_EVENTS[0]) > EYE_CLOSURE_FREQ_WIN:
+        while EYE_CLOSURE_EVENTS and (now - EYE_CLOSURE_EVENTS[0]) > CONFIG['EYE_CLOSURE_FREQ_WIN']:
             EYE_CLOSURE_EVENTS.popleft()
         
-        # Check if frequency exceeds threshold
-        frequent_closures = len(EYE_CLOSURE_EVENTS) > EYE_CLOSURE_FREQ_THRESH
+        frequent_closures = len(EYE_CLOSURE_EVENTS) > CONFIG['EYE_CLOSURE_FREQ_THRESH']
 
         # --- Microsleep & blink counting ---
         global EYE_CLOSED_START, MICROSLEEP_COUNT, MICROSLEEP_COUNTED
@@ -131,54 +220,48 @@ def detect_driver_behavior(face_blendshapes: np.ndarray, height, current_frame) 
             if EYE_CLOSED_START is None:
                 EYE_CLOSED_START = now
         else:
-            # eye reopened -> count a blink if it was brief
             if EYE_CLOSED_START is not None:
                 duration = now - EYE_CLOSED_START
-                if duration < 0.4:   # Quick blink (less than 0.4 seconds)
+                if duration < CONFIG['BLINK_MAX_DURATION']:
                     BLINK_TIMES.append(now)
                 EYE_CLOSED_START = None
-                MICROSLEEP_COUNTED = False  # Reset flag when eyes reopen
+                MICROSLEEP_COUNTED = False
 
-        # keep only last 60s blinks
         while BLINK_TIMES and (now - BLINK_TIMES[0]) > 60.0:
             BLINK_TIMES.popleft()
         blinks_per_min = len(BLINK_TIMES)
 
-        microsleep = (EYE_CLOSED_START is not None) and ((now - EYE_CLOSED_START) >= MICROSLEEP_SEC)
+        microsleep = (EYE_CLOSED_START is not None) and ((now - EYE_CLOSED_START) >= CONFIG['MICROSLEEP_SEC'])
         
-        # Count microsleep event only once
         if microsleep and not MICROSLEEP_COUNTED:
             MICROSLEEP_COUNT += 1
             MICROSLEEP_COUNTED = True
 
-        # --- Yawn detection (sustained high mouthLowerDown) ---
+        # --- Yawn detection ---
         global YAWN_START, YAWN_COUNT, YAWN_COUNTED
         yawning = False
-        if mouth_lower_down > YAWN_THRESH:
+        if mouth_lower_down > CONFIG['YAWN_THRESH']:
             if YAWN_START is None:
                 YAWN_START = now
-            elif (now - YAWN_START) >= YAWN_MIN_SEC:
+            elif (now - YAWN_START) >= CONFIG['YAWN_MIN_SEC']:
                 yawning = True
-                # Count yawn only once per event
                 if not YAWN_COUNTED:
                     YAWN_COUNT += 1
                     YAWN_COUNTED = True
         else:
             YAWN_START = None
-            YAWN_COUNTED = False  # Reset flag when yawn ends
+            YAWN_COUNTED = False
 
         # --- Drowsiness decision ---
         global DROWSY_COUNT, DROWSY_COUNTED
-        drowsy = microsleep or (perclos >= PERCLOS_DROWSY) or yawning or frequent_closures
+        drowsy = microsleep or (perclos >= CONFIG['PERCLOS_DROWSY']) or yawning or frequent_closures
         
-        # Count drowsiness event only once per continuous drowsy period
         if drowsy and not DROWSY_COUNTED:
             DROWSY_COUNT += 1
             DROWSY_COUNTED = True
         elif not drowsy:
-            DROWSY_COUNTED = False  # Reset flag when alert
+            DROWSY_COUNTED = False
 
-        # Return the metrics for display
         return {
             'drowsy': drowsy,
             'yawning': yawning,
@@ -197,66 +280,36 @@ def run(model: str, num_faces: int,
         min_face_detection_confidence: float,
         min_face_presence_confidence: float, min_tracking_confidence: float,
         camera_id: int, width: int, height: int) -> None:
-    """Continuously run inference on images acquired from the camera.
+    """Continuously run inference on images acquired from the camera."""
 
-  Args:
-      model: Name of the face landmarker model bundle.
-      num_faces: Max number of faces that can be detected by the landmarker.
-      min_face_detection_confidence: The minimum confidence score for face
-        detection to be considered successful.
-      min_face_presence_confidence: The minimum confidence score of face
-        presence score in the face landmark detection.
-      min_tracking_confidence: The minimum confidence score for the face
-        tracking to be considered successful.
-      camera_id: The camera id to be passed to OpenCV.
-      width: The width of the frame captured from the camera.
-      height: The height of the frame captured from the camera.
-  """
-
-    # Start capturing video input from the camera
     cap = cv2.VideoCapture(camera_id)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
-    # Visualization parameters
-    row_size = 50  # pixels
-    left_margin = 24  # pixels
-    text_color = (0, 0, 0)  # black
-    font_size = 1
-    font_thickness = 1
-    fps_avg_frame_count = 10
-
-    # Label box parameters
-    label_background_color = (255, 255, 255)  # White
-    label_padding_width = 1500  # pixels
-
     global SCROLL_OFFSET, MAX_SCROLL
 
-    # Mouse callback for scrolling
     def mouse_callback(event, x, y, flags, param):
         global SCROLL_OFFSET, MAX_SCROLL
         if event == cv2.EVENT_MOUSEWHEEL:
-            if flags > 0:  # Scroll up
-                SCROLL_OFFSET = max(0, SCROLL_OFFSET - 20)
-            else:  # Scroll down
-                SCROLL_OFFSET = min(MAX_SCROLL, SCROLL_OFFSET + 20)
+            if flags > 0:
+                SCROLL_OFFSET = max(0, SCROLL_OFFSET - CONFIG['SCROLL_STEP'])
+            else:
+                SCROLL_OFFSET = min(MAX_SCROLL, SCROLL_OFFSET + CONFIG['SCROLL_STEP'])
 
-    cv2.namedWindow('SafeDriver Monitoring System')
-    cv2.setMouseCallback('SafeDriver Monitoring System', mouse_callback)
+    cv2.namedWindow(CONFIG['WINDOW_NAME'])
+    cv2.setMouseCallback(CONFIG['WINDOW_NAME'], mouse_callback)
 
     def save_result(result: vision.FaceLandmarkerResult,
                     unused_output_image: mp.Image, timestamp_ms: int):
         global FPS, COUNTER, START_TIME, DETECTION_RESULT
 
-        # Calculate the FPS (frame per second)
-        if COUNTER % fps_avg_frame_count == 0:
-            FPS = fps_avg_frame_count / (time.time() - START_TIME)
+        if COUNTER % CONFIG['FPS_AVG_FRAME_COUNT'] == 0:
+            FPS = CONFIG['FPS_AVG_FRAME_COUNT'] / (time.time() - START_TIME)
             START_TIME = time.time()
 
         DETECTION_RESULT = result
         COUNTER += 1
 
-    # Initialize the face landmarker model
     base_options = python.BaseOptions(model_asset_path=model)
     options = vision.FaceLandmarkerOptions(
         base_options=base_options,
@@ -269,41 +322,31 @@ def run(model: str, num_faces: int,
         result_callback=save_result)
     detector = vision.FaceLandmarker.create_from_options(options)
 
-    # Continuously capture images from the camera and run inference
     while cap.isOpened():
         success, image = cap.read()
         if not success:
-            sys.exit(
-                'ERROR: Unable to read from webcam. Please verify your webcam settings.'
-            )
+            sys.exit(CONFIG['CAMERA_ERROR_MSG'])
 
         image = cv2.flip(image, 1)
-
-        # Convert the image from BGR to RGB as required by the TFLite model.
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_image)
-
-        # Run face landmarker using the model.
         detector.detect_async(mp_image, time.time_ns() // 1_000_000)
 
-        # Show the FPS with smaller font
-        fps_text = 'FPS = {:.1f}'.format(FPS)
-        text_location = (left_margin, row_size - 20)
+        # Show FPS
+        fps_text = CONFIG['FPS_TEXT_FORMAT'].format(FPS)
+        text_location = (CONFIG['LEFT_MARGIN'], CONFIG['ROW_SIZE'] + CONFIG['FPS_Y_OFFSET'])
         current_frame = image
         cv2.putText(current_frame, fps_text, text_location,
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    0.5, text_color, 1, cv2.LINE_AA)  # Reduced size and thickness
+                    CONFIG['FPS_FONT'], CONFIG['FPS_FONT_SIZE'], 
+                    CONFIG['FPS_COLOR'], CONFIG['FPS_FONT_THICKNESS'], cv2.LINE_AA)
 
         if DETECTION_RESULT:
-            # Draw landmarks.
+            # Draw landmarks
             for face_landmarks in DETECTION_RESULT.face_landmarks:
                 face_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
                 face_landmarks_proto.landmark.extend([
-                    landmark_pb2.NormalizedLandmark(x=landmark.x,
-                                                    y=landmark.y,
-                                                    z=landmark.z) for
-                    landmark in
-                    face_landmarks
+                    landmark_pb2.NormalizedLandmark(x=landmark.x, y=landmark.y, z=landmark.z)
+                    for landmark in face_landmarks
                 ])
                 mp_drawing.draw_landmarks(
                     image=current_frame,
@@ -327,173 +370,125 @@ def run(model: str, num_faces: int,
                     connection_drawing_spec=mp.solutions.drawing_styles
                     .get_default_face_mesh_iris_connections_style())
 
-        # Expand the right side frame to show the blendshapes.
+        # Expand right side for blendshapes
         current_frame = cv2.copyMakeBorder(current_frame, 0, 0, 0,
-                                           label_padding_width,
+                                           CONFIG['LABEL_PADDING_WIDTH'],
                                            cv2.BORDER_CONSTANT, None,
-                                           label_background_color)
+                                           CONFIG['LABEL_BG_COLOR'])
 
         if DETECTION_RESULT:
-            # Define parameters for the bars and text
-            legend_x = current_frame.shape[1] - label_padding_width + 20
-            legend_y = 30 - SCROLL_OFFSET
-            bar_max_width = label_padding_width - 40
-            bar_height = 8
-            gap_between_bars = 5
-            text_gap = 5
+            legend_x = current_frame.shape[1] - CONFIG['LABEL_PADDING_WIDTH'] + CONFIG['BLENDSHAPE_X_OFFSET']
+            legend_y = CONFIG['BLENDSHAPE_Y_START'] - SCROLL_OFFSET
+            bar_max_width = CONFIG['LABEL_PADDING_WIDTH'] - 40
 
             face_blendshapes = DETECTION_RESULT.face_blendshapes
 
             if face_blendshapes:
-
-                # Detect driver behavior
                 behavior_data = detect_driver_behavior(face_blendshapes, current_frame.shape[0], current_frame)
                 
                 if behavior_data:
-                    # Calculate the background rectangle dimensions
-                    metrics_padding = 10  # pixels padding around text
-                    metrics_x = left_margin - metrics_padding
-                    metrics_y = row_size # Moved up by 10px (was row_size + 20)
-                    metrics_width = 175  # Width to accommodate all text
-                    metrics_height = 140  # Height for 6 metrics
+                    # Draw metrics background
+                    metrics_x = CONFIG['LEFT_MARGIN'] - CONFIG['METRICS_PADDING']
+                    metrics_y = CONFIG['ROW_SIZE'] + CONFIG['METRICS_Y_OFFSET']
                     
-                    # Create a semi-transparent white overlay for the metrics
                     overlay = current_frame.copy()
+                    corner_radius = CONFIG['METRICS_CORNER_RADIUS']
                     
-                    # Draw rounded rectangle (using multiple rectangles and circles for corners)
-                    corner_radius = 10
-                    
-                    # Main rectangles - adjusted to align with corner circles
+                    # Draw rounded rectangle
                     cv2.rectangle(overlay,
                                 (metrics_x + corner_radius, metrics_y),
-                                (metrics_x + metrics_width - corner_radius, metrics_y + metrics_height),
-                                (255, 255, 255), -1)
+                                (metrics_x + CONFIG['METRICS_WIDTH'] - corner_radius, 
+                                 metrics_y + CONFIG['METRICS_HEIGHT']),
+                                CONFIG['METRICS_BG_COLOR'], -1)
                     cv2.rectangle(overlay,
                                 (metrics_x, metrics_y + corner_radius),
-                                (metrics_x + metrics_width, metrics_y + metrics_height - corner_radius),
-                                (255, 255, 255), -1)
+                                (metrics_x + CONFIG['METRICS_WIDTH'], 
+                                 metrics_y + CONFIG['METRICS_HEIGHT'] - corner_radius),
+                                CONFIG['METRICS_BG_COLOR'], -1)
                     
-                    # Corner circles - keep same positions
-                    cv2.circle(overlay, (metrics_x + corner_radius, metrics_y + corner_radius),
-                             corner_radius, (255, 255, 255), -1)
-                    cv2.circle(overlay, (metrics_x + metrics_width - corner_radius, metrics_y + corner_radius),
-                             corner_radius, (255, 255, 255), -1)
-                    cv2.circle(overlay, (metrics_x + corner_radius, metrics_y + metrics_height - corner_radius),
-                             corner_radius, (255, 255, 255), -1)
-                    cv2.circle(overlay, (metrics_x + metrics_width - corner_radius, metrics_y + metrics_height - corner_radius),
-                             corner_radius, (255, 255, 255), -1)
+                    # Corner circles
+                    for dx, dy in [(corner_radius, corner_radius),
+                                   (CONFIG['METRICS_WIDTH'] - corner_radius, corner_radius),
+                                   (corner_radius, CONFIG['METRICS_HEIGHT'] - corner_radius),
+                                   (CONFIG['METRICS_WIDTH'] - corner_radius, CONFIG['METRICS_HEIGHT'] - corner_radius)]:
+                        cv2.circle(overlay, (metrics_x + dx, metrics_y + dy),
+                                 corner_radius, CONFIG['METRICS_BG_COLOR'], -1)
                     
-                    # Apply the overlay with 0.5 opacity
-                    cv2.addWeighted(overlay, 0.5, current_frame, 0.5, 0, current_frame)
+                    cv2.addWeighted(overlay, CONFIG['METRICS_BG_OPACITY'], 
+                                  current_frame, 1 - CONFIG['METRICS_BG_OPACITY'], 0, current_frame)
                     
-                    # Display PERCLOS and Blink rate under FPS (top left)
-                    cv2.putText(current_frame, f"PERCLOS: {behavior_data['perclos']:.2f}", 
-                               (left_margin, row_size + 20),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
-                    cv2.putText(current_frame, f"Blinks/min: {behavior_data['blinks_per_min']:02d}", 
-                               (left_margin, row_size + 40),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
-                    cv2.putText(current_frame, f"Closures(15s): {behavior_data['closure_count']}", 
-                               (left_margin, row_size + 60),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
+                    # Display metrics
+                    metrics_data = [
+                        (CONFIG['LABEL_PERCLOS'].format(behavior_data['perclos']), CONFIG['PERCLOS_Y_OFFSET']),
+                        (CONFIG['LABEL_BLINKS'].format(behavior_data['blinks_per_min']), CONFIG['BLINKS_Y_OFFSET']),
+                        (CONFIG['LABEL_CLOSURES'].format(behavior_data['closure_count']), CONFIG['CLOSURES_Y_OFFSET']),
+                        (CONFIG['LABEL_YAWNS'].format(behavior_data['yawn_count']), CONFIG['YAWNS_Y_OFFSET']),
+                        (CONFIG['LABEL_MICROSLEEPS'].format(behavior_data['microsleep_count']), CONFIG['MICROSLEEPS_Y_OFFSET']),
+                        (CONFIG['LABEL_DROWSY_EVENTS'].format(behavior_data['drowsy_count']), CONFIG['DROWSY_EVENTS_Y_OFFSET']),
+                    ]
                     
-                    # Display event counts (top left, below other metrics)
-                    cv2.putText(current_frame, f"Yawns: {behavior_data['yawn_count']}", 
-                               (left_margin, row_size + 85),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
-                    cv2.putText(current_frame, f"Microsleeps: {behavior_data['microsleep_count']}", 
-                               (left_margin, row_size + 105),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
-                    cv2.putText(current_frame, f"Drowsy Events: {behavior_data['drowsy_count']}", 
-                               (left_margin, row_size + 125),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
+                    for text, y_offset in metrics_data:
+                        cv2.putText(current_frame, text,
+                                   (CONFIG['LEFT_MARGIN'], CONFIG['ROW_SIZE'] + y_offset),
+                                   CONFIG['METRICS_FONT'], CONFIG['METRICS_FONT_SIZE'],
+                                   CONFIG['METRICS_TEXT_COLOR'], CONFIG['METRICS_FONT_THICKNESS'], cv2.LINE_AA)
                     
-                    # Display warnings in top right (only show if detected)
-                    frame_width = current_frame.shape[1] - label_padding_width
-                    warning_color = (0, 0, 255)  # Red color
+                    # Display warnings
+                    frame_width = current_frame.shape[1] - CONFIG['LABEL_PADDING_WIDTH']
                     
-                    # Priority: Microsleep > Yawning > Frequent Closures > General Drowsiness
-                    if behavior_data['microsleep']:
-                        warning_text = "Microsleep Detected!"
-                        (text_width, text_height), _ = cv2.getTextSize(warning_text, 
-                                                                        cv2.FONT_HERSHEY_DUPLEX, 
-                                                                        1.0, 2)
-                        right_x = frame_width - text_width - 20
-                        cv2.putText(current_frame, warning_text, 
-                                   (right_x, 50),
-                                   cv2.FONT_HERSHEY_DUPLEX, 1.0, warning_color, 2, cv2.LINE_AA)
-                        print(f"Microsleep detected (Total: {behavior_data['microsleep_count']})")
+                    warning_checks = [
+                        (behavior_data['microsleep'], CONFIG['WARNING_MICROSLEEP'], 
+                         CONFIG['CONSOLE_MICROSLEEP'].format(behavior_data['microsleep_count'])),
+                        (behavior_data['yawning'], CONFIG['WARNING_YAWNING'],
+                         CONFIG['CONSOLE_YAWN'].format(behavior_data['yawn_count'])),
+                        (behavior_data['frequent_closures'], CONFIG['WARNING_FREQUENT_CLOSURES'],
+                         CONFIG['CONSOLE_FREQUENT_CLOSURES']),
+                        (behavior_data['drowsy'], CONFIG['WARNING_DROWSY'],
+                         CONFIG['CONSOLE_DROWSY'].format(behavior_data['drowsy_count'])),
+                    ]
                     
-                    elif behavior_data['yawning']:
-                        warning_text = "Yawning Detected!"
-                        (text_width, text_height), _ = cv2.getTextSize(warning_text, 
-                                                                        cv2.FONT_HERSHEY_DUPLEX, 
-                                                                        1.0, 2)
-                        right_x = frame_width - text_width - 20
-                        cv2.putText(current_frame, warning_text, 
-                                   (right_x, 50),
-                                   cv2.FONT_HERSHEY_DUPLEX, 1.0, warning_color, 2, cv2.LINE_AA)
-                        print(f"Yawn detected (Total: {behavior_data['yawn_count']})")
-                    
-                    elif behavior_data['frequent_closures']:
-                        warning_text = "Frequent Eye Closures!"
-                        (text_width, text_height), _ = cv2.getTextSize(warning_text, 
-                                                                        cv2.FONT_HERSHEY_DUPLEX, 
-                                                                        1.0, 2)
-                        right_x = frame_width - text_width - 20
-                        cv2.putText(current_frame, warning_text, 
-                                   (right_x, 50),
-                                   cv2.FONT_HERSHEY_DUPLEX, 1.0, warning_color, 2, cv2.LINE_AA)
-                        print("Frequent eye closures detected")
-                    
-                    elif behavior_data['drowsy']:
-                        warning_text = "Drowsiness Detected!"
-                        (text_width, text_height), _ = cv2.getTextSize(warning_text, 
-                                                                        cv2.FONT_HERSHEY_DUPLEX, 
-                                                                        1.0, 2)
-                        right_x = frame_width - text_width - 20
-                        cv2.putText(current_frame, warning_text, 
-                                   (right_x, 50),
-                                   cv2.FONT_HERSHEY_DUPLEX, 1.0, warning_color, 2, cv2.LINE_AA)
-                        print(f"Drowsiness detected (Total: {behavior_data['drowsy_count']})")
+                    for condition, warning_text, console_msg in warning_checks:
+                        if condition:
+                            (text_width, _), _ = cv2.getTextSize(warning_text,
+                                                                 CONFIG['WARNING_FONT'],
+                                                                 CONFIG['WARNING_FONT_SIZE'],
+                                                                 CONFIG['WARNING_FONT_THICKNESS'])
+                            right_x = frame_width - text_width - CONFIG['WARNING_RIGHT_MARGIN']
+                            cv2.putText(current_frame, warning_text,
+                                       (right_x, CONFIG['WARNING_Y_POSITION']),
+                                       CONFIG['WARNING_FONT'], CONFIG['WARNING_FONT_SIZE'],
+                                       CONFIG['WARNING_COLOR'], CONFIG['WARNING_FONT_THICKNESS'], cv2.LINE_AA)
+                            print(console_msg)
+                            break
                 
+                # Draw blendshapes
                 num_blendshapes = len(face_blendshapes[0])
-                total_height = num_blendshapes * (bar_height + gap_between_bars)
+                total_height = num_blendshapes * (CONFIG['BLENDSHAPE_BAR_HEIGHT'] + CONFIG['BLENDSHAPE_GAP_BETWEEN_BARS'])
                 MAX_SCROLL = max(0, total_height - current_frame.shape[0] + 60)
                 
-                for idx, category in enumerate(face_blendshapes[0]):
-                    # Only draw if within visible area
-                    if legend_y + bar_height > 0 and legend_y < current_frame.shape[0]:
-                        category_name = category.category_name
-                        score = round(category.score, 2)
+                for category in face_blendshapes[0]:
+                    if legend_y + CONFIG['BLENDSHAPE_BAR_HEIGHT'] > 0 and legend_y < current_frame.shape[0]:
+                        text = CONFIG['BLENDSHAPE_TEXT_FORMAT'].format(category.category_name, round(category.score, 2))
+                        (text_width, _), _ = cv2.getTextSize(text, CONFIG['BLENDSHAPE_FONT'],
+                                                            CONFIG['BLENDSHAPE_FONT_SIZE'],
+                                                            CONFIG['BLENDSHAPE_FONT_THICKNESS'])
 
-                        # Prepare text and get its width
-                        text = "{} ({:.2f})".format(category_name, score)
-                        (text_width, _), _ = cv2.getTextSize(text,
-                                                            cv2.FONT_HERSHEY_SIMPLEX,
-                                                            0.4, 1)
-
-                        # Display the blendshape name and score
                         cv2.putText(current_frame, text,
-                                    (legend_x, legend_y + (bar_height // 2) + 5),
-                                    cv2.FONT_HERSHEY_SIMPLEX,
-                                    0.4, (0, 0, 0), 1, cv2.LINE_AA)
+                                    (legend_x, legend_y + (CONFIG['BLENDSHAPE_BAR_HEIGHT'] // 2) + 5),
+                                    CONFIG['BLENDSHAPE_FONT'], CONFIG['BLENDSHAPE_FONT_SIZE'],
+                                    CONFIG['BLENDSHAPE_TEXT_COLOR'], CONFIG['BLENDSHAPE_FONT_THICKNESS'], cv2.LINE_AA)
 
-                        # Calculate bar width based on score
-                        bar_width = int(bar_max_width * score)
-
-                        # Draw the bar to the right of the text
+                        bar_width = int(bar_max_width * category.score)
                         cv2.rectangle(current_frame,
-                                        (legend_x + text_width + text_gap, legend_y),
-                                        (legend_x + text_width + text_gap + bar_width,
-                                        legend_y + bar_height),
-                                        (0, 255, 0), -1)
+                                    (legend_x + text_width + CONFIG['BLENDSHAPE_TEXT_GAP'], legend_y),
+                                    (legend_x + text_width + CONFIG['BLENDSHAPE_TEXT_GAP'] + bar_width,
+                                     legend_y + CONFIG['BLENDSHAPE_BAR_HEIGHT']),
+                                    CONFIG['BLENDSHAPE_BAR_COLOR'], -1)
 
-                    legend_y += (bar_height + gap_between_bars)
+                    legend_y += (CONFIG['BLENDSHAPE_BAR_HEIGHT'] + CONFIG['BLENDSHAPE_GAP_BETWEEN_BARS'])
 
-        cv2.imshow('SafeDriver Monitoring System', current_frame)
+        cv2.imshow(CONFIG['WINDOW_NAME'], current_frame)
 
-        # Stop the program if the ESC key is pressed.
         if cv2.waitKey(1) == 27:
             break
 
@@ -533,10 +528,6 @@ def main():
              'considered successful.',
         required=False,
         default=0.5)
-    # Finding the camera ID can be very reliant on platform-dependent methods.
-    # One common approach is to use the fact that camera IDs are usually indexed sequentially by the OS, starting from 0.
-    # Here, we use OpenCV and create a VideoCapture object for each potential ID with 'cap = cv2.VideoCapture(i)'.
-    # If 'cap' is None or not 'cap.isOpened()', it indicates the camera ID is not available.
     parser.add_argument(
         '--cameraId', help='Id of camera.', required=False, default=0)
     parser.add_argument(
