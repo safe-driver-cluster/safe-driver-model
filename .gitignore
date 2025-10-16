@@ -1,3 +1,5 @@
 /venv
 /driver_dataset/videos
 /driver_dataset/frames
+config.bat
+node_modules

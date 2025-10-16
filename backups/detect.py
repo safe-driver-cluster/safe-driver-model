@@ -13,6 +13,7 @@
 # limitations under the License.
 """Main scripts to run face landmarker."""
 
+import utils.session
 import argparse
 import sys
 import time
